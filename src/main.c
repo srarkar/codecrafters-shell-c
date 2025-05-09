@@ -23,8 +23,9 @@ int main(int argc, char *argv[]) {
     
     // check if echo is the first thing in input
     char *echo_check = strstr(input, "echo");
+    printf("%s echo check\n", echo_check);
     if (echo_check == input) {
-      printf("%s", &input[5]);
+      printf("%s\n", &input[5]);
       printf("$ ");
       continue;
     }
