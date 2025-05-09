@@ -9,10 +9,12 @@ int main(int argc, char *argv[]) {
 
   printf("$ ");
 
-  // Wait for user input
+  // Wait for user input;
   char input[100];
-  fgets(input, 100, stdin);
-  input[strlen(input) - 1] = '\0'; // set null terminator to remove trailing new line 
-  printf("%s: command not found\n", input);
+  while (true) {
+    fgets(input, 100, stdin);
+    input[strlen(input) - 1] = '\0'; // set null terminator to remove trailing new line 
+    printf("%s: command not found\n", input);
+  }
   return 0;
 }
