@@ -17,12 +17,13 @@ int main(int argc, char *argv[]) {
     input[strlen(input) - 1] = '\0';
 
     // check for exit prompt
-    if (!strstr(input, "exit 0")) {
+    if (!strcmp(input, "exit 0")) {
       break;
     }
     
     // check if echo is the first thing in input
-    char *echo_check = strstr(input, "echo");
+    char echo[] = "echo";
+    char *echo_check = strstr(input, echo);
     printf("%s echo check\n", echo_check);
     if (echo_check == input) {
       printf("%s\n", &input[5]);
