@@ -30,6 +30,17 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
+    // built-in commands
+    char type[] = "type";
+    char *type_check = strstr(input, type);
+    if (type_check == input) {
+      if (strcmp(&input[5], "type") || strcmp(&input[5], "echo") || strcmp(&input[5], "exit")) {
+        printf("%s is a shell builtin\n", &input[5]);
+        continue;
+      }
+    }
+
+    
     printf("%s: command not found\n", input);
     printf("$ ");
   }
