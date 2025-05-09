@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
     fgets(input, 100, stdin);
     input[strlen(input) - 1] = '\0'; // set null terminator to remove trailing new line 
     printf("%s: command not found\n", input);
+    printf("$ ")
   }
   return 0;
 }
