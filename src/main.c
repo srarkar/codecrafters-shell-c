@@ -36,9 +36,11 @@ int main(int argc, char *argv[]) {
     if (type_check == input) {
       if (!strcmp(&input[5], "type") || !strcmp(&input[5], "echo") || !strcmp(&input[5], "exit")) {
         printf("%s is a shell builtin\n", &input[5]);
-        printf("$ ");
-        continue;
+      } else {
+        printf("%s: command not found\n", &input[5]);
       }
+      printf("$ ");
+      continue;
     }
 
     
