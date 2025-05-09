@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     char type[] = "type";
     char *type_check = strstr(input, type);
     if (type_check == input) {
-      if (strcmp(&input[5], "type") || strcmp(&input[5], "echo") || strcmp(&input[5], "exit")) {
+      if (!strcmp(&input[5], "type") || !strcmp(&input[5], "echo") || !strcmp(&input[5], "exit")) {
         printf("%s is a shell builtin\n", &input[5]);
         printf("$ ");
         continue;
