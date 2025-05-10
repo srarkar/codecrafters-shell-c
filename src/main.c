@@ -2,6 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+
+static void echo_handler(char* input) {
+  char *token = strtok(input, " ");
+  printf("%s\n", strtok(NULL, "")); // print rest of input, excluding first token (echo)
+  printf("$ ");
+}
+
+
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
@@ -50,10 +59,4 @@ int main(int argc, char *argv[]) {
     printf("$ ");
   }
   return 0;
-}
-
-static void echo_handler(char* input) {
-  char *token = strtok(input, " ");
-  printf("%s\n", strtok(NULL, "")); // print rest of input, excluding first token (echo)
-  printf("$ ");
 }
