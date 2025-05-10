@@ -16,18 +16,20 @@ int main(int argc, char *argv[]) {
     fgets(input, 100, stdin);
     input[strlen(input) - 1] = '\0';
 
+    char* temp_input = input;
+
     // check for exit prompt
     if (!strcmp(input, "exit 0")) {
       break;
     }
-    
-    // check if echo is the first thing in input
-    char echo[] = "echo";
-    char *echo_check = strstr(input, echo);
-    if (echo_check == input) {
-      printf("%s\n", &input[5]);
-      printf("$ ");
+
+    char *token = strtok(temp_input, " ");
+
+    if (!strcmp(token, "echo")) {
+      echo_handler(input);
       continue;
+    } else if (!strcmp(token, "type")) {
+
     }
 
     // built-in commands
@@ -48,4 +50,10 @@ int main(int argc, char *argv[]) {
     printf("$ ");
   }
   return 0;
+}
+
+static void echo_handler(char* input) {
+  char *token = strtok(input, " ");
+  printf("%s\n", strtok(NULL, "")); // print rest of input, excluding first token (echo)
+  printf("$ ");
 }
