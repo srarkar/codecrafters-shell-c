@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     char *token = strtok(temp_input, " ");
 
     if (!strcmp(token, "echo")) {
-      echo_handler(input);
+      echo_handler(temp_input);
       continue;
     } else if (!strcmp(token, "type")) {
 
