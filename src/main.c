@@ -28,13 +28,14 @@ static void type_handler(char* input, char** paths, int path_count) {
         if (strcmp(entry->d_name, next_token) == 0) {
           printf("%s is %s/%s", next_token, paths[i], next_token);
           found = 1;
+          closedir(dir);
           break;
         }
       }
       closedir(dir);
     }
   }
-  if (found) {
+  if (!found) {
     printf("%s: not found\n", next_token);
   }
   printf("$ ");
