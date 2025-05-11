@@ -6,6 +6,21 @@
 
 
 
+// checks if a token is a builtin command or not
+// returns 1 if token is builtin and 0 otherwise
+static char check_builtin(char *token) {
+  char* builtins[] = {"type", "echo", "exit"};
+  int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
+  for (int i = 0; i < num_builtins; i++) {
+    if (strcmp(builtins[i], token) == 0) {
+      return 1; // builtin found
+    }
+  }
+  return 0; // builtin not found
+}
+
+
+
 static void echo_handler(char* input) {
   printf("%s\n", input); // print rest of input, excluding first token (echo)
   printf("$ ");
@@ -13,12 +28,11 @@ static void echo_handler(char* input) {
 
 static void type_handler(char* input, char** paths, int path_count) {
   
-  char *builtins = "type echo exit"; // EDIT THIS WHEN ADDING BUILTINS
   char found = 0;
   DIR* dir;
   struct dirent *entry;
   char *next_token = strtok(input, " "); // grab token after "type"
-  if (strstr(builtins, next_token) != NULL) {
+  if (check_builtin(next_token)) {
     printf("%s is a shell builtin\n", next_token);
     found = 1;
   } else {
@@ -48,6 +62,12 @@ static void type_handler(char* input, char** paths, int path_count) {
 
 
 int main(int argc, char *argv[]) {
+
+  // use execve to run command
+  // use fork to create copy of my own shell so it's not lost
+  // use wait so my shell waits until command (child) process finishes. 
+  // how to know if a command is actually external? 
+
   // Flush after every printf
   setbuf(stdout, NULL);
   printf("$ ");
