@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
         free(paths[j]); // free all previous elements if strdup fails
       }
       free(path_copy);
+      free(paths);
       return 0;
     }
 
