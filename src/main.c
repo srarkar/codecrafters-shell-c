@@ -53,6 +53,8 @@ int main(int argc, char *argv[]) {
   
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
   char* path = strdup(getenv("PATH"));
+  // save original pointer for later free
+  char* path_copy = path; 
 
    // allocate array of strings
   char** paths  = calloc((1000), sizeof(char*)); // not accepting a PATH with any more than 999 paths
@@ -73,6 +75,7 @@ int main(int argc, char *argv[]) {
       for (int j = 0; j < path_count; j++) {
         free(paths[j]); // free all previous elements if strdup fails
       }
+      free(path_copy);
       return 0;
     }
 
@@ -89,6 +92,11 @@ int main(int argc, char *argv[]) {
 
     // check for exit prompt
     if (!strcmp(input, "exit 0")) {
+      free(path_copy);
+      for (int j = 0; j < path_count; j++) {
+          free(paths[j]);
+      }
+      free(paths);
       break;
     }
 
