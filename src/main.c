@@ -19,7 +19,21 @@ static char check_builtin(char *token) {
   return 0; // builtin not found
 }
 
+static char* find_in_path(char* token, char** paths, int path_count) {
+  DIR* dir;
+  struct dirent* entry;
 
+  for (int i = 0; i < path_count; i++) {
+    dir = opendir(paths[i]);
+    while ((entry = readdir(dir)) != NULL) {
+      if (strcmp(entry->d_name, token) == 0) {
+        return(paths[i]);
+      }
+    }
+    closedir(dir);
+  }
+  return "";
+}
 
 static void echo_handler(char* input) {
   printf("%s\n", input); // print rest of input, excluding first token (echo)
@@ -27,35 +41,17 @@ static void echo_handler(char* input) {
 }
 
 static void type_handler(char* input, char** paths, int path_count) {
-  
-  char found = 0;
-  DIR* dir;
-  struct dirent *entry;
+
   char *next_token = strtok(input, " "); // grab token after "type"
   if (check_builtin(next_token)) {
-    printf("%s is a shell builtin\n", next_token);
-    found = 1;
+    printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
   } else {
-
-    // search for next_token in PATH
-    for (int i = 0; i < path_count; i++) {
-      dir = opendir(paths[i]);
-      while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, next_token) == 0) {
-          printf("%s is %s/%s\n", next_token, paths[i], next_token);
-          found = 1;
-          break;
-        }
-      }
-      closedir(dir);
-      if (found) {
-        break;
-      }
+    char* search_path = find_in_path(next_token, paths, path_count); // search for next_token in PATH
+    if (strcmp(search_path, "")) {
+      printf("%s is %s/%s\n", next_token, search_path, next_token);
+    } else {
+      printf("%s: not found\n", next_token);
     }
-
-  }
-  if (!found) {
-    printf("%s: not found\n", next_token);
   }
   printf("$ ");
 }
