@@ -25,6 +25,7 @@ static char* find_in_path(char* token, char** paths, int path_count) {
 
   for (int i = 0; i < path_count; i++) {
     dir = opendir(paths[i]);
+    if (!dir) continue;    // skip invalid/unopenable PATH entry
     while ((entry = readdir(dir)) != NULL) {
       if (strcmp(entry->d_name, token) == 0) {
         return(paths[i]);
@@ -43,6 +44,11 @@ static void echo_handler(char* input) {
 static void type_handler(char* input, char** paths, int path_count) {
 
   char *next_token = strtok(input, " "); // grab token after "type"
+  if (!next_token) {
+    printf("$ ");
+    return;
+  }
+  
   if (check_builtin(next_token)) {
     printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
   } else {
