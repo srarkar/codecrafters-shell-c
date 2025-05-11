@@ -26,8 +26,9 @@ static void type_handler(char* input, char** paths, int path_count) {
       dir = opendir(paths[i]);
       while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, next_token) == 0) {
-          printf("%s is %s", next_token, paths[i]);
+          printf("%s is %s/%s", next_token, paths[i], next_token);
           found = 1;
+          break;
         }
       }
       closedir(dir);
