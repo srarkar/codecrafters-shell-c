@@ -12,7 +12,7 @@
 // checks if a token is a builtin command or not
 // returns 1 if token is builtin and 0 otherwise
 static char check_builtin(char *token) {
-  char* builtins[] = {"type", "echo", "exit"};
+  char* builtins[] = {"type", "echo", "exit", "pwd"};
   int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
   for (int i = 0; i < num_builtins; i++) {
     if (strcmp(builtins[i], token) == 0) {
@@ -37,6 +37,16 @@ static char* find_in_path(char* token, char** paths, int path_count) {
     closedir(dir);
   }
   return "";
+}
+
+static char* find_in_env(char* envp[], char *token) {
+  int token_len = strlen(token);
+  for (int i = 0; envp[i] != NULL; i++) {
+    if (!strncmp(envp[i], token, token_len)) {
+        return envp[i] + token_len;
+    }
+}
+return 0; // not found
 }
 
 static void echo_handler(char* input) {
@@ -74,9 +84,9 @@ int main(int argc, char *argv[], char * envp[]) {
 
   
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
-  char* path = strdup(getenv("PATH"));
+  char* path = strdup(find_in_env(envp, "PATH="));
   if (!path) {
-    printf("No PATH");
+    printf("No PATH provided");
     return 0;
   }
 
@@ -116,7 +126,9 @@ int main(int argc, char *argv[], char * envp[]) {
       echo_handler(temp_input);
     } else if (!strcmp(token, "type")) {
       type_handler(temp_input, paths, path_count);
-    } else if (strcmp(search_path, "") != 0){
+    } else if (!strcmp(token, "pwd")) {
+      printf("%s\n", find_in_env(envp, "PWD="));
+    }else if (strcmp(search_path, "") != 0){
       // handle external command execution
       // use execve to run command
       // use fork to create copy of my own shell so it's not lost
