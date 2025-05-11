@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 
 
 
@@ -38,7 +41,6 @@ static char* find_in_path(char* token, char** paths, int path_count) {
 
 static void echo_handler(char* input) {
   printf("%s\n", input); // print rest of input, excluding first token (echo)
-  printf("$ ");
 }
 
 static void type_handler(char* input, char** paths, int path_count) {
@@ -59,17 +61,10 @@ static void type_handler(char* input, char** paths, int path_count) {
       printf("%s: not found\n", next_token);
     }
   }
-  printf("$ ");
 }
 
 
-int main(int argc, char *argv[]) {
-
-  // use execve to run command
-  // use fork to create copy of my own shell so it's not lost
-  // use wait so my shell waits until command (child) process finishes. 
-  // how to know if a command is actually external? 
-
+int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
   printf("$ ");
@@ -115,16 +110,51 @@ int main(int argc, char *argv[]) {
     }
 
     char *token = strtok_r(temp_input, " ", &temp_input);
+    char* search_path = find_in_path(token, paths, path_count);
 
     if (!strcmp(token, "echo")) {
       echo_handler(temp_input);
     } else if (!strcmp(token, "type")) {
       type_handler(temp_input, paths, path_count);
+    } else if (strcmp(search_path, "") != 0){
+      // handle external command execution
+      // use execve to run command
+      // use fork to create copy of my own shell so it's not lost
+      // use wait so my shell waits until command (child) process finishes. 
+      char* args[100]; // array to hold args
+      args[0] = token;
+      int argc = 1;
+      while ((args[argc] = strsep(&temp_input, " ")) != NULL) {
+       if (*args[argc] != '\0') // skip empty tokens (due to multiple spaces)
+         argc++;
+      }
+      args[argc] = NULL;
+
+      
+      pid_t parent = getpid();
+      pid_t pid = fork();
+
+      if (pid == -1) {
+          printf("error, failed to fork");
+          return 0;
+      } else if (pid > 0) {
+          int status;
+          waitpid(pid, &status, 0);
+      } else {
+        char *complete_path = malloc(strlen(search_path) + strlen(token) + 2); // "/" and "\0"
+        if (!complete_path) {
+            printf("malloc failed to allocate string");
+            return 0;
+        }
+        sprintf(complete_path, "%s/%s", search_path, token);
+        execve(complete_path, args, envp);
+        _exit(EXIT_FAILURE);   // exec never returns
+        return 0;
+      }
     } else {
       printf("%s: command not found\n", input);
-      printf("$ ");
     }
-
+    printf("$ ");
   }
   return 0;
 }
