@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#define PATH_MAX 1000
 
 
 
@@ -12,14 +13,14 @@
 // checks if a token is a builtin command or not
 // returns 1 if token is builtin and 0 otherwise
 static char check_builtin(char *token) {
-  char* builtins[] = {"type", "echo", "exit", "pwd"};
+  char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
   int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
   for (int i = 0; i < num_builtins; i++) {
     if (strcmp(builtins[i], token) == 0) {
-      return 1; // builtin found
+      return 0; // builtin found
     }
   }
-  return 0; // builtin not found
+  return 1; // builtin not found
 }
 
 static char* find_in_path(char* token, char** paths, int path_count) {
@@ -61,7 +62,7 @@ static void type_handler(char* input, char** paths, int path_count) {
     return;
   }
   
-  if (check_builtin(next_token)) {
+  if (!check_builtin(next_token)) {
     printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
   } else {
     char* search_path = find_in_path(next_token, paths, path_count); // search for next_token in PATH
@@ -87,14 +88,14 @@ int main(int argc, char *argv[], char * envp[]) {
   char* path = strdup(find_in_env(envp, "PATH="));
   if (!path) {
     printf("No PATH provided");
-    return 0;
+    return 1;
   }
 
    // allocate array of strings
-  char** paths  = calloc((1000), sizeof(char*)); // not accepting a PATH with any more than 999 paths
+  char** paths  = calloc((PATH_MAX), sizeof(char*)); // not accepting a PATH with any more than 999 paths
   if (!paths) {
     printf("String array allocation: Out of memory");
-    return 0;
+    return 1;
   }
 
   // separate PATH into tokens and store into string array 
@@ -124,11 +125,27 @@ int main(int argc, char *argv[], char * envp[]) {
 
     if (!strcmp(token, "echo")) {
       echo_handler(temp_input);
+
     } else if (!strcmp(token, "type")) {
       type_handler(temp_input, paths, path_count);
+
     } else if (!strcmp(token, "pwd")) {
-      printf("%s\n", find_in_env(envp, "PWD="));
-    }else if (strcmp(search_path, "") != 0){
+      char cwd[PATH_MAX];
+      if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+      } else {
+        printf("Error retrieving current working directory");
+        return 1;
+      }
+
+    } else if (!strcmp(token, "cd")) {
+    // this does NOT work (yet)
+    int cd = chdir(temp_input);
+    if (cd != 0) {
+      printf("cd: %s: No such file or directory\n", temp_input);
+    }
+
+    } else if (strcmp(search_path, "") != 0){
       // handle external command execution
       // use execve to run command
       // use fork to create copy of my own shell so it's not lost
@@ -148,7 +165,7 @@ int main(int argc, char *argv[], char * envp[]) {
 
       if (pid == -1) {
           printf("error, failed to fork");
-          return 0;
+          return 1;
       } else if (pid > 0) {
           int status;
           waitpid(pid, &status, 0);
@@ -156,12 +173,12 @@ int main(int argc, char *argv[], char * envp[]) {
         char *complete_path = malloc(strlen(search_path) + strlen(token) + 2); // "/" and "\0"
         if (!complete_path) {
             printf("malloc failed to allocate string");
-            return 0;
+            return 1;
         }
         sprintf(complete_path, "%s/%s", search_path, token);
         execve(complete_path, args, envp);
         _exit(EXIT_FAILURE);   // exec never returns
-        return 0;
+        return 1;
       }
     } else {
       printf("%s: command not found\n", input);
