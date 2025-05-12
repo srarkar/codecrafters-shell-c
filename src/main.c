@@ -139,8 +139,12 @@ int main(int argc, char *argv[], char * envp[]) {
       }
 
     } else if (!strcmp(token, "cd")) {
-    // this does NOT work (yet)
-    int cd = chdir(temp_input);
+    int cd;
+    if (!strcmp(temp_input, "~")) { // return to home directory
+       cd = chdir(find_in_env(envp, "HOME="));
+    } else {
+      cd = chdir(temp_input);
+    }
     if (cd != 0) {
       printf("cd: %s: No such file or directory\n", temp_input);
     }
