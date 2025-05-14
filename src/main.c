@@ -42,7 +42,20 @@ static int tokenize_input (char* first_token, char* rest, char* args[]) {
         if (*rest == '\'') {
           rest++;  // skip ending quote
         }
-      } else {
+      } else if (*rest == '\"'){
+        rest++;  // skip starting quote
+        while (*rest && *rest != '\"') {
+          if (j < 999) {
+            buf[j++] = *rest++;
+          } else {
+            rest++;
+          }
+        }
+        if (*rest == '\"') {
+          rest++;  // skip ending quote
+        }
+      }
+      else {
         if (j < 999) { 
           buf[j++] = *rest++;
         } else {
