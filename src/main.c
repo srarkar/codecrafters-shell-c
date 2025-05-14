@@ -5,9 +5,60 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
 
 
+static int tokenize_input (char* first_token, char* rest, char* args[]) {
+  // 2-D array: each token has its own array, used to build the full token that will go into args
+  static char token_bufs[MAX_NUM_TOKENS][1000]; // max length of tokens: 999 chars
+  int argc = 0;
+  int token_i = 0;
+
+  args[argc++] = first_token;
+  if (!rest) {
+    args[argc] = NULL;
+    return argc;
+  }
+
+  while (*rest) {
+    // Skip leading spaces
+    while (*rest == ' ') rest++;
+    if (*rest == '\0') break;
+
+    char *buf = token_bufs[token_i]; // 1 row of token_bufs
+    int j = 0;
+
+    while (*rest && *rest != ' ') {
+      if (*rest == '\'') {
+        rest++;  // skip starting quote
+        while (*rest && *rest != '\'') {
+          if (j < 999) {
+            buf[j++] = *rest++;
+          } else {
+            rest++;
+          }
+        }
+        if (*rest == '\'') {
+          rest++;  // skip ending quote
+        }
+      } else {
+        if (j < 999) { 
+          buf[j++] = *rest++;
+        } else {
+          rest++;
+        }
+      }
+    }
+
+    buf[j] = '\0';
+    args[argc++] = buf;
+    token_i++;
+  }
+
+  args[argc] = NULL;
+  return argc;
+}
 
 
 // checks if a token is a builtin command or not
@@ -50,26 +101,26 @@ static char* find_in_env(char* envp[], char *token) {
 return 0; // not found
 }
 
-static void echo_handler(char* input) {
-  printf("%s\n", input); // print rest of input, excluding first token (echo)
+static void echo_handler(char* args[], int argc) {
+  for (int i = 1; i < argc; i++) { 
+    printf("%s ", args[i]); // print rest of input, excluding first token (echo)
+  }
+  printf("\n");
 }
 
-static void type_handler(char* input, char** paths, int path_count) {
-
-  char *next_token = strtok(input, " "); // grab token after "type"
-  if (!next_token) {
-    printf("$ ");
-    return;
-  }
-  
-  if (!check_builtin(next_token)) {
-    printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
-  } else {
-    char* search_path = find_in_path(next_token, paths, path_count); // search for next_token in PATH
-    if (strcmp(search_path, "")) {
-      printf("%s is %s/%s\n", next_token, search_path, next_token);
+static void type_handler(char* args[], int argc, char** paths, int path_count) {
+  char *next_token;
+  for (int i = 0; i < argc - 1; i++) {
+    next_token = args[i];
+    if (!check_builtin(next_token)) {
+      printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
     } else {
-      printf("%s: not found\n", next_token);
+      char* search_path = find_in_path(next_token, paths, path_count); // search for next_token in PATH
+      if (strcmp(search_path, "")) {
+        printf("%s is %s/%s\n", next_token, search_path, next_token);
+      } else {
+        printf("%s: not found\n", next_token);
+      }
     }
   }
 }
@@ -81,7 +132,7 @@ int main(int argc, char *argv[], char * envp[]) {
   printf("$ ");
 
   // Wait for user input;
-  char input[100];
+  char input[MAX_NUM_TOKENS];
 
   
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
@@ -108,10 +159,9 @@ int main(int argc, char *argv[], char * envp[]) {
   }
 
 
-
   while (1) {
     // take input and format by removing trailing new line
-    fgets(input, 100, stdin);
+    fgets(input, MAX_NUM_TOKENS, stdin);
     input[strlen(input) - 1] = '\0';
     char* temp_input = input;
 
@@ -121,20 +171,30 @@ int main(int argc, char *argv[], char * envp[]) {
     }
 
     char *token = strtok_r(temp_input, " ", &temp_input);
-    char* search_path = find_in_path(token, paths, path_count);
+    if (token == NULL) {
+      printf("$ ");
+      continue;  
+  }
+    /////
+    // TODO: tokenize input (accounting for single quotes)
+    // Then, store into args[] array and update builtins to use args[] instead of temp_input
+    /////
+    char* args[MAX_NUM_TOKENS]; // array to hold args
+    argc = tokenize_input(token, temp_input, args);
+    char* search_path = find_in_path(args[0], paths, path_count);
 
     if (!strcmp(token, "echo")) {
-      echo_handler(temp_input);
+      echo_handler(args, argc);
 
     } else if (!strcmp(token, "type")) {
-      type_handler(temp_input, paths, path_count);
+      type_handler(args + 1, argc, paths, path_count);
 
     } else if (!strcmp(token, "pwd")) {
       char cwd[PATH_MAX];
       if (getcwd(cwd, sizeof(cwd)) != NULL) {
         printf("%s\n", cwd);
       } else {
-        printf("Error retrieving current working directory");
+        printf("Error retrieving current working directory\n");
         return 1;
       }
 
@@ -154,14 +214,6 @@ int main(int argc, char *argv[], char * envp[]) {
       // use execve to run command
       // use fork to create copy of my own shell so it's not lost
       // use wait so my shell waits until command (child) process finishes. 
-      char* args[100]; // array to hold args
-      args[0] = token;
-      int argc = 1;
-      while ((args[argc] = strsep(&temp_input, " ")) != NULL) {
-       if (*args[argc] != '\0') // skip empty tokens (due to multiple spaces)
-         argc++;
-      }
-      args[argc] = NULL;
 
       
       pid_t parent = getpid();
@@ -185,7 +237,7 @@ int main(int argc, char *argv[], char * envp[]) {
         return 1;
       }
     } else {
-      printf("%s: command not found\n", input);
+      printf("%s: command not found\n", args[0]);
     }
     printf("$ ");
   }
