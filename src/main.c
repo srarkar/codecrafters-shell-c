@@ -59,6 +59,9 @@ static int tokenize_input (char* first_token, char* rest, char* args[]) {
         rest++;  // skip starting quote
         while (*rest && *rest != '\"') {
           if (j < 999) {
+            if (*rest == '\\' && ((*(rest + 1) == '\\') || (*(rest + 1) == '$') || (*(rest + 1) == (int)10) || (*(rest + 1) == '\"'))) {
+              rest++;
+            }
             buf[j++] = *rest++;
           } else {
             rest++;
