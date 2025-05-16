@@ -29,7 +29,20 @@ static int tokenize_input (char* first_token, char* rest, char* args[]) {
     char *buf = token_bufs[token_i]; // 1 row of token_bufs
     int j = 0;
 
-    while (*rest && *rest != ' ') {
+    while (*rest) {
+      if (*rest == ' ') {
+        break;
+      }
+      if (*rest == '\\') {
+        rest++;
+        if (*rest) {
+          buf[j] = *rest;
+          j++;
+          rest++;
+        }
+        continue;
+      }
+
       if (*rest == '\'') {
         rest++;  // skip starting quote
         while (*rest && *rest != '\'') {
@@ -228,7 +241,6 @@ int main(int argc, char *argv[], char * envp[]) {
       // use fork to create copy of my own shell so it's not lost
       // use wait so my shell waits until command (child) process finishes. 
 
-      
       pid_t parent = getpid();
       pid_t pid = fork();
 
