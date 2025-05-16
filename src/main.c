@@ -9,13 +9,11 @@
 #define PATH_MAX 1000
 
 
-static int tokenize_input (char* first_token, char* rest, char* args[]) {
+static int tokenize_input (char* rest, char* args[]) {
   // 2-D array: each token has its own array, used to build the full token that will go into args
   static char token_bufs[MAX_NUM_TOKENS][1000]; // max length of tokens: 999 chars
   int argc = 0;
   int token_i = 0;
-
-  args[argc++] = first_token;
   if (!rest) {
     args[argc] = NULL;
     return argc;
@@ -53,7 +51,12 @@ static int tokenize_input (char* first_token, char* rest, char* args[]) {
           }
         }
         if (*rest == '\'') {
+          if (*(rest + 1) == '\'') {
+            rest+=2;
+            continue;
+          }
           rest++;  // skip ending quote
+          break;
         }
       } else if (*rest == '\"'){
         rest++;  // skip starting quote
@@ -199,26 +202,21 @@ int main(int argc, char *argv[], char * envp[]) {
       break;
     }
 
-    char *token = strtok_r(temp_input, " ", &temp_input);
-    if (token == NULL) {
-      printf("$ ");
-      continue;  
-  }
     /////
     // TODO: tokenize input (accounting for single quotes)
     // Then, store into args[] array and update builtins to use args[] instead of temp_input
     /////
     char* args[MAX_NUM_TOKENS]; // array to hold args
-    argc = tokenize_input(token, temp_input, args);
+    argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths, path_count);
 
-    if (!strcmp(token, "echo")) {
+    if (!strcmp(args[0], "echo")) {
       echo_handler(args, argc);
 
-    } else if (!strcmp(token, "type")) {
+    } else if (!strcmp(args[0], "type")) {
       type_handler(args + 1, argc, paths, path_count);
 
-    } else if (!strcmp(token, "pwd")) {
+    } else if (!strcmp(args[0], "pwd")) {
       char cwd[PATH_MAX];
       if (getcwd(cwd, sizeof(cwd)) != NULL) {
         printf("%s\n", cwd);
@@ -227,15 +225,15 @@ int main(int argc, char *argv[], char * envp[]) {
         return 1;
       }
 
-    } else if (!strcmp(token, "cd")) {
+    } else if (!strcmp(args[0], "cd")) {
     int cd;
-    if (!strcmp(temp_input, "~")) { // return to home directory
+    if (!strcmp(args[1], "~")) { // return to home directory
        cd = chdir(find_in_env(envp, "HOME="));
     } else {
-      cd = chdir(temp_input);
+      cd = chdir(args[1]);
     }
     if (cd != 0) {
-      printf("cd: %s: No such file or directory\n", temp_input);
+      printf("cd: %s: No such file or directory\n", args[1]);
     }
 
     } else if (strcmp(search_path, "") != 0){
@@ -254,12 +252,12 @@ int main(int argc, char *argv[], char * envp[]) {
           int status;
           waitpid(pid, &status, 0);
       } else {
-        char *complete_path = malloc(strlen(search_path) + strlen(token) + 2); // "/" and "\0"
+        char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
         if (!complete_path) {
             printf("malloc failed to allocate string");
             return 1;
         }
-        sprintf(complete_path, "%s/%s", search_path, token);
+        sprintf(complete_path, "%s/%s", search_path, args[0]);
         execve(complete_path, args, envp);
         _exit(EXIT_FAILURE);   // exec never returns
         return 1;
