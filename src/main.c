@@ -62,6 +62,7 @@ static int tokenize_input (char* rest, char* args[]) {
         rest++;  // skip starting quote
         while (*rest && *rest != '\"') {
           if (j < 999) {
+            // handle exceptions preceded by backslash
             if (*rest == '\\' && ((*(rest + 1) == '\\') || (*(rest + 1) == '$') || (*(rest + 1) == (int)10) || (*(rest + 1) == '\"'))) {
               rest++;
             }
@@ -94,7 +95,7 @@ static int tokenize_input (char* rest, char* args[]) {
 
 
 // checks if a token is a builtin command or not
-// returns 1 if token is builtin and 0 otherwise
+// returns 0 if token is builtin and 1 otherwise (either invalid or an external)
 static char check_builtin(char *token) {
   char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
   int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
@@ -157,12 +158,54 @@ static void type_handler(char* args[], int argc, char** paths, int path_count) {
   }
 }
 
+static void cd_handler(char* args[], int argc, char* envp[]) {
+  int cd;
+  if (!strcmp(args[1], "~")) { // return to home directory
+      cd = chdir(find_in_env(envp, "HOME="));
+  } else {
+    cd = chdir(args[1]);
+  }
+  if (cd != 0) {
+    printf("cd: %s: No such file or directory\n", args[1]);
+  }
+}
+
+static void pwd_handler(void){
+  char cwd[PATH_MAX];
+  if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    printf("%s\n", cwd);
+  } else {
+    printf("Error retrieving current working directory\n");
+  }
+}
+
+static int external_handler(char* args[], char* envp[], char* search_path) {
+  pid_t parent = getpid();
+  pid_t pid = fork();
+
+  if (pid == -1) {
+      printf("error, failed to fork");
+      return 1;
+  } else if (pid > 0) {
+      int status;
+      waitpid(pid, &status, 0);
+  } else {
+    char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
+    if (!complete_path) {
+        return 1;
+    }
+    sprintf(complete_path, "%s/%s", search_path, args[0]);
+    execve(complete_path, args, envp);
+    _exit(EXIT_FAILURE);   // exec never returns
+    return 2;
+  } 
+}
 
 int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
   printf("$ ");
-
+  
   // Wait for user input;
   char input[MAX_NUM_TOKENS];
 
@@ -217,54 +260,25 @@ int main(int argc, char *argv[], char * envp[]) {
       type_handler(args + 1, argc, paths, path_count);
 
     } else if (!strcmp(args[0], "pwd")) {
-      char cwd[PATH_MAX];
-      if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("%s\n", cwd);
-      } else {
-        printf("Error retrieving current working directory\n");
-        return 1;
-      }
+      pwd_handler();
 
     } else if (!strcmp(args[0], "cd")) {
-    int cd;
-    if (!strcmp(args[1], "~")) { // return to home directory
-       cd = chdir(find_in_env(envp, "HOME="));
-    } else {
-      cd = chdir(args[1]);
-    }
-    if (cd != 0) {
-      printf("cd: %s: No such file or directory\n", args[1]);
-    }
+      cd_handler(args, argc, envp);
 
-    } else if (strcmp(search_path, "") != 0){
-      // handle external command execution
-      // use execve to run command
-      // use fork to create copy of my own shell so it's not lost
-      // use wait so my shell waits until command (child) process finishes. 
-
-      pid_t parent = getpid();
-      pid_t pid = fork();
-
-      if (pid == -1) {
-          printf("error, failed to fork");
-          return 1;
-      } else if (pid > 0) {
-          int status;
-          waitpid(pid, &status, 0);
-      } else {
-        char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
-        if (!complete_path) {
-            printf("malloc failed to allocate string");
-            return 1;
-        }
-        sprintf(complete_path, "%s/%s", search_path, args[0]);
-        execve(complete_path, args, envp);
-        _exit(EXIT_FAILURE);   // exec never returns
-        return 1;
+    } else if (strcmp(search_path, "") != 0) {
+      int err = external_handler(args, envp, search_path);
+      if (err == 1) {
+        printf("malloc failure");
       }
+      if (err == 2) {
+        printf("exec failure");
+      }
+
     } else {
       printf("%s: command not found\n", args[0]);
     }
+
+    // print $ at start of next line
     printf("$ ");
   }
   return 0;
