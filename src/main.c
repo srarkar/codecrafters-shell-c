@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <fcntl.h> 
 #include <sys/types.h>
 #include <sys/wait.h>
 #define MAX_NUM_TOKENS 100
@@ -136,6 +137,9 @@ return 0; // not found
 
 static void echo_handler(char* args[], int argc) {
   for (int i = 1; i < argc; i++) { 
+    if (args[i] == NULL) {
+      break;
+    }
     printf("%s ", args[i]); // print rest of input, excluding first token (echo)
   }
   printf("\n");
@@ -143,7 +147,7 @@ static void echo_handler(char* args[], int argc) {
 
 static void type_handler(char* args[], int argc, char** paths, int path_count) {
   char *next_token;
-  for (int i = 0; i < argc - 1; i++) {
+  for (int i = 1; i < argc; i++) {
     next_token = args[i];
     if (!check_builtin(next_token)) {
       printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
@@ -179,27 +183,28 @@ static void pwd_handler(void){
   }
 }
 
-static int external_handler(char* args[], char* envp[], char* search_path) {
-  pid_t parent = getpid();
-  pid_t pid = fork();
+// static int external_handler(char* args[], char* envp[], char* search_path) {
+//   pid_t parent = getpid();
+//   pid_t pid = fork();
 
-  if (pid == -1) {
-      printf("error, failed to fork");
-      return 1;
-  } else if (pid > 0) {
-      int status;
-      waitpid(pid, &status, 0);
-  } else {
-    char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
-    if (!complete_path) {
-        return 1;
-    }
-    sprintf(complete_path, "%s/%s", search_path, args[0]);
-    execve(complete_path, args, envp);
-    _exit(EXIT_FAILURE);   // exec never returns
-    return 2;
-  } 
-}
+//   if (pid == -1) {
+//       printf("error, failed to fork");
+//       return 1;
+//   } else if (pid > 0) {
+//       int status;
+//       waitpid(pid, &status, 0);
+//   } else {
+//     char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
+//     if (!complete_path) {
+//         return 1;
+//     }
+//     sprintf(complete_path, "%s/%s", search_path, args[0]);
+//     execve(complete_path, args, envp);
+//     _exit(EXIT_FAILURE);   // exec never returns
+//     return 2;
+//   }
+//   return 0;
+// }
 
 int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
@@ -209,7 +214,6 @@ int main(int argc, char *argv[], char * envp[]) {
   // Wait for user input;
   char input[MAX_NUM_TOKENS];
 
-  
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
   char* path = strdup(find_in_env(envp, "PATH="));
   if (!path) {
@@ -217,7 +221,7 @@ int main(int argc, char *argv[], char * envp[]) {
     return 1;
   }
 
-   // allocate array of strings
+  // allocate array of strings
   char** paths  = calloc((PATH_MAX), sizeof(char*)); // not accepting a PATH with any more than 999 paths
   if (!paths) {
     printf("String array allocation: Out of memory");
@@ -227,12 +231,10 @@ int main(int argc, char *argv[], char * envp[]) {
   // separate PATH into tokens and store into string array 
   char *token;
   int path_count = 0;
-
   while ((token = strsep(&path, ":")) != NULL) {
     paths[path_count] = token; 
     path_count++;
   }
-
 
   while (1) {
     // take input and format by removing trailing new line
@@ -245,37 +247,82 @@ int main(int argc, char *argv[], char * envp[]) {
       break;
     }
 
-    /////
-    // TODO: tokenize input (accounting for single quotes)
+    // tokenize input (accounting for single quotes)
     // Then, store into args[] array and update builtins to use args[] instead of temp_input
-    /////
     char* args[MAX_NUM_TOKENS]; // array to hold args
     argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths, path_count);
 
-    if (!strcmp(args[0], "echo")) {
-      echo_handler(args, argc);
+    int i = 0;
+    int stdoutput = -1;
+    char* output_file = NULL;
 
-    } else if (!strcmp(args[0], "type")) {
-      type_handler(args + 1, argc, paths, path_count);
+    // search for redirect char
+    while (args[i]) {
+      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>")) {
+        stdoutput = i;
+        args[stdoutput] = NULL; // break between LHS and RHS of redirect operator
+        output_file = args[stdoutput + 1]; // extract output file path
+        break;
+      }
+      i++;
+    }
 
-    } else if (!strcmp(args[0], "pwd")) {
-      pwd_handler();
+    // for stdout redirect:
+    // pull command from left side of > operator (LHS)
+    // use dup/dup2(?) to override stdout temporarily
+    // redirect stdout to the file on the RHS
+    // execute LHS
+    // make sure stdout is reverted back to normal 1 afterwards.
 
-    } else if (!strcmp(args[0], "cd")) {
+    // special case: cd affects parent process directly
+    if (!strcmp(args[0], "cd")) {
       cd_handler(args, argc, envp);
-
-    } else if (strcmp(search_path, "") != 0) {
-      int err = external_handler(args, envp, search_path);
-      if (err == 1) {
-        printf("malloc failure");
-      }
-      if (err == 2) {
-        printf("exec failure");
-      }
-
     } else {
-      printf("%s: command not found\n", args[0]);
+      pid_t pid = fork();
+      if (pid == -1) {
+        printf("fork failed");
+        return 1;
+      }
+
+      if (pid == 0) {
+        // CHILD process
+        if (output_file) {
+          int fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+          if (fd < 0) {
+            printf("error opening file\n");
+            exit(1);
+          }
+          dup2(fd, STDOUT_FILENO); // redirect stdout
+          close(fd);               // close original fd
+        }
+
+        if (!strcmp(args[0], "echo")) {
+          echo_handler(args, argc);
+
+        } else if (!strcmp(args[0], "type")) {
+          type_handler(args, argc, paths, path_count);
+
+        } else if (!strcmp(args[0], "pwd")) {
+          pwd_handler();
+
+        } else if (strcmp(search_path, "") != 0) {
+          char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
+          if (!complete_path) {
+              exit(1);
+          }
+          sprintf(complete_path, "%s/%s", search_path, args[0]);
+          execve(complete_path, args, envp);
+          _exit(EXIT_FAILURE);   // exec never returns
+        } else {
+          printf("%s: command not found\n", args[0]);
+        }
+        exit(0); // exit after builtin execution
+      } else {
+        // PARENT
+        int status;
+        waitpid(pid, &status, 0);
+      }
     }
 
     // print $ at start of next line
@@ -283,3 +330,4 @@ int main(int argc, char *argv[], char * envp[]) {
   }
   return 0;
 }
+
