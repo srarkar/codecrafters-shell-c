@@ -253,17 +253,21 @@ int main(int argc, char *argv[], char * envp[]) {
     char* search_path = find_in_path(args[0], paths, path_count);
 
     int i = 0;
-    int redirect_type;
     int stdoutput = -1;
     char* output_file = NULL;
 
+    int redirect_type = -1;
+    int fd = -1;
+
     // search for redirect char
     while (args[i]) {
-      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>") || !strcmp(args[i], "2>")) {
+      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>") || !strcmp(args[i], "2>") || !strcmp(args[i], ">>") || !strcmp(args[i], "1>>")) {
         if (!strcmp(args[i], ">") || !strcmp(args[i], "1>")) {
           redirect_type = 1; // stdout
-        } else {
+        } else if (!strcmp(args[i], "2>") ){
           redirect_type = 2; // stderr
+        } else {
+          redirect_type = 3; // append
         }
         stdoutput = i;
         args[stdoutput] = NULL; // break between LHS and RHS of redirect operator
@@ -293,7 +297,11 @@ int main(int argc, char *argv[], char * envp[]) {
       if (pid == 0) {
         // CHILD process
         if (output_file) {
-          int fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+          if (redirect_type != 3) {
+            fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+          } else {
+            fd = open(output_file, O_CREAT | O_WRONLY | O_APPEND, 0644);
+          }
           if (fd < 0) {
             printf("error opening file\n");
             exit(1);
@@ -304,6 +312,9 @@ int main(int argc, char *argv[], char * envp[]) {
               break;
             case 2:
               dup2(fd, STDERR_FILENO); // redirect stdout
+              break;
+            case 3:
+              dup2(fd, STDOUT_FILENO); // redirect stdout
               break;
           }
           close(fd);               // close original fd
