@@ -186,7 +186,6 @@ static void pwd_handler(void){
 // static int external_handler(char* args[], char* envp[], char* search_path) {
 //   pid_t parent = getpid();
 //   pid_t pid = fork();
-
 //   if (pid == -1) {
 //       printf("error, failed to fork");
 //       return 1;
@@ -254,12 +253,18 @@ int main(int argc, char *argv[], char * envp[]) {
     char* search_path = find_in_path(args[0], paths, path_count);
 
     int i = 0;
+    int redirect_type;
     int stdoutput = -1;
     char* output_file = NULL;
 
     // search for redirect char
     while (args[i]) {
-      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>")) {
+      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>") || !strcmp(args[i], "2>")) {
+        if (!strcmp(args[i], ">") || !strcmp(args[i], "1>")) {
+          redirect_type = 1; // stdout
+        } else {
+          redirect_type = 2; // stderr
+        }
         stdoutput = i;
         args[stdoutput] = NULL; // break between LHS and RHS of redirect operator
         output_file = args[stdoutput + 1]; // extract output file path
@@ -293,7 +298,14 @@ int main(int argc, char *argv[], char * envp[]) {
             printf("error opening file\n");
             exit(1);
           }
-          dup2(fd, STDOUT_FILENO); // redirect stdout
+          switch (redirect_type) {
+            case 1:
+              dup2(fd, STDOUT_FILENO); // redirect stdout
+              break;
+            case 2:
+              dup2(fd, STDERR_FILENO); // redirect stdout
+              break;
+          }
           close(fd);               // close original fd
         }
 
