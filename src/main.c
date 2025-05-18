@@ -261,13 +261,19 @@ int main(int argc, char *argv[], char * envp[]) {
 
     // search for redirect char
     while (args[i]) {
-      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>") || !strcmp(args[i], "2>") || !strcmp(args[i], ">>") || !strcmp(args[i], "1>>")) {
+      if (!strcmp(args[i], ">") || !strcmp(args[i], "1>") 
+        || !strcmp(args[i], "2>") 
+        || !strcmp(args[i], ">>") || !strcmp(args[i], "1>>")
+        || !strcmp(args[i], "2>>")) {
+
         if (!strcmp(args[i], ">") || !strcmp(args[i], "1>")) {
           redirect_type = 1; // stdout
         } else if (!strcmp(args[i], "2>") ){
           redirect_type = 2; // stderr
+        } else if (!strcmp(args[i], ">>") || !strcmp(args[i], "1>>")){
+          redirect_type = 3; // append stdout
         } else {
-          redirect_type = 3; // append
+          redirect_type = 4; // append stderr
         }
         stdoutput = i;
         args[stdoutput] = NULL; // break between LHS and RHS of redirect operator
@@ -297,9 +303,9 @@ int main(int argc, char *argv[], char * envp[]) {
       if (pid == 0) {
         // CHILD process
         if (output_file) {
-          if (redirect_type != 3) {
+          if (redirect_type == 1 || redirect_type == 2) {
             fd = open(output_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-          } else {
+          } else if (redirect_type == 3 || redirect_type == 4) {
             fd = open(output_file, O_CREAT | O_WRONLY | O_APPEND, 0644);
           }
           if (fd < 0) {
@@ -308,13 +314,12 @@ int main(int argc, char *argv[], char * envp[]) {
           }
           switch (redirect_type) {
             case 1:
+            case 3:
               dup2(fd, STDOUT_FILENO); // redirect stdout
               break;
             case 2:
+            case 4:
               dup2(fd, STDERR_FILENO); // redirect stdout
-              break;
-            case 3:
-              dup2(fd, STDOUT_FILENO); // redirect stdout
               break;
           }
           close(fd);               // close original fd
