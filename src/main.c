@@ -4,12 +4,45 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h> 
+#include <readline/readline.h>
+#include <readline/history.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
 
 
+char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
+static int num_builtins = 5;
+
+// returns successive matches for the current input on repeated tab presses
+char* builtin_generator(const char* text, int state) {
+  static int list_index;
+  static int len;
+  char* name;
+
+  if (!state) {
+    list_index = 0;
+    len = strlen(text);
+  }
+
+  while (list_index < num_builtins) {
+    name = builtins[list_index];
+    list_index++;
+    if (strncmp(name, text, len) == 0) {
+      return strdup(name);  // must be strdup'd for readline to manage
+    }
+  }
+  return NULL;
+}
+
+// called by readline when user pressed Tab
+char** my_completion(const char* text, int start, int end) {
+  rl_attempted_completion_over = 1;  // don't use default filename completion
+  return rl_completion_matches(text, builtin_generator);
+}
+
+// break apart input into tokens, and store into args[]
 static int tokenize_input (char* rest, char* args[]) {
   // 2-D array: each token has its own array, used to build the full token that will go into args
   static char token_bufs[MAX_NUM_TOKENS][1000]; // max length of tokens: 999 chars
@@ -46,14 +79,16 @@ static int tokenize_input (char* rest, char* args[]) {
         rest++;  // skip starting quote
         while (*rest && *rest != '\'') {
           if (j < 999) {
-            buf[j++] = *rest++;
+            buf[j] = *rest;
+            j++;
+            rest++;
           } else {
             rest++;
           }
         }
         if (*rest == '\'') {
           if (*(rest + 1) == '\'') {
-            rest+=2;
+            rest += 2;
             continue;
           }
           rest++;  // skip ending quote
@@ -67,7 +102,9 @@ static int tokenize_input (char* rest, char* args[]) {
             if (*rest == '\\' && ((*(rest + 1) == '\\') || (*(rest + 1) == '$') || (*(rest + 1) == (int)10) || (*(rest + 1) == '\"'))) {
               rest++;
             }
-            buf[j++] = *rest++;
+            buf[j] = *rest;
+            j++;
+            rest++;
           } else {
             rest++;
           }
@@ -78,7 +115,9 @@ static int tokenize_input (char* rest, char* args[]) {
       }
       else {
         if (j < 999) { 
-          buf[j++] = *rest++;
+          buf[j] = *rest;
+          j++;
+          rest++;
         } else {
           rest++;
         }
@@ -86,7 +125,8 @@ static int tokenize_input (char* rest, char* args[]) {
     }
 
     buf[j] = '\0';
-    args[argc++] = buf;
+    args[argc] = buf;
+    argc++;
     token_i++;
   }
 
@@ -98,7 +138,6 @@ static int tokenize_input (char* rest, char* args[]) {
 // checks if a token is a builtin command or not
 // returns 0 if token is builtin and 1 otherwise (either invalid or an external)
 static char check_builtin(char *token) {
-  char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
   int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
   for (int i = 0; i < num_builtins; i++) {
     if (strcmp(builtins[i], token) == 0) {
@@ -208,7 +247,7 @@ static void pwd_handler(void){
 int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
-  printf("$ ");
+  //printf("$ ");
   
   // Wait for user input;
   char input[MAX_NUM_TOKENS];
@@ -234,24 +273,30 @@ int main(int argc, char *argv[], char * envp[]) {
     paths[path_count] = token; 
     path_count++;
   }
+  rl_attempted_completion_function = my_completion;
 
   while (1) {
     // take input and format by removing trailing new line
-    fgets(input, MAX_NUM_TOKENS, stdin);
-    input[strlen(input) - 1] = '\0';
+    char* line = readline("$ ");
+    if (!line) break;  // EOF (Ctrl+D)
+    if (*line) add_history(line);  // save non-empty input
+    strncpy(input, line, MAX_NUM_TOKENS - 1);
+    input[MAX_NUM_TOKENS - 1] = '\0';
+    free(line);
+    
     char* temp_input = input;
-
-    // check for exit prompt
-    if (!strcmp(input, "exit 0")) {
-      break;
-    }
 
     // tokenize input (accounting for single quotes)
     // Then, store into args[] array and update builtins to use args[] instead of temp_input
     char* args[MAX_NUM_TOKENS]; // array to hold args
     argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths, path_count);
-
+    
+    // check for exit prompt
+    if (!strcmp(args[0], "exit")) {
+      break;
+    }
+    
     int i = 0;
     int stdoutput = -1;
     char* output_file = NULL;
@@ -354,7 +399,7 @@ int main(int argc, char *argv[], char * envp[]) {
     }
 
     // print $ at start of next line
-    printf("$ ");
+    //printf("$ ");
   }
   return 0;
 }
