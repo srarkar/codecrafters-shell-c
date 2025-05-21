@@ -11,7 +11,6 @@
 #define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
 
-// make sure to compile with:
 // gcc -o main main.c -lreadline
 // to avoid linker errors when attempting to compile
 
