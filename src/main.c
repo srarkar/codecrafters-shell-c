@@ -10,41 +10,88 @@
 #include <sys/wait.h>
 #define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
+#define MAX_MATCHES 1024
 
 // gcc -o main main.c -lreadline
 // to avoid linker errors when attempting to compile
 
+// built in commands (as opposed to external)
 char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
-static int num_builtins = 5;
+static int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // 5
+
+char** paths;
+static int path_count;
 
 // returns successive matches for the current input on repeated tab presses
-char* builtin_generator(const char* text, int state) {
-  static int list_index;
-  static int len;
-  char* name;
+char *command_generator(const char *text, int state) {
+  static int match_index, len;
+  static char *matches[MAX_MATCHES];
+  static int num_matches;
 
-  if (!state) {
-    list_index = 0;
-    len = strlen(text);
+  if (state == 0) {
+      match_index = 0;
+      len = strlen(text);
+      num_matches = 0;
+
+      // Clear previous matches
+      for (int i = 0; i < MAX_MATCHES; i++) {
+          free(matches[i]);
+          matches[i] = NULL;
+      }
+
+      // check builtins
+      for (int i = 0; i < num_builtins; i++) {
+          if (strncmp(builtins[i], text, len) == 0) {
+              matches[num_matches++] = strdup(builtins[i]);
+              if (num_matches >= MAX_MATCHES) break;
+          }
+      }
+
+      // check all executables in PATH (much like find_in_path())
+      for (int i = 0; i < path_count; i++) {
+          DIR *dir = opendir(paths[i]);
+          if (!dir) continue;
+
+          struct dirent *entry;
+          while ((entry = readdir(dir)) != NULL) {
+              if (entry->d_name[0] == '.') continue;
+
+              // prefix match first n chars
+              if (strncmp(entry->d_name, text, len) == 0) {
+                  // avoid dupes
+                  int duplicate = 0;
+                  for (int j = 0; j < num_matches; j++) {
+                      if (strcmp(matches[j], entry->d_name) == 0) {
+                          duplicate = 1;
+                          break;
+                      }
+                  }
+
+                  if (!duplicate) {
+                      matches[num_matches++] = strdup(entry->d_name);
+                      if (num_matches >= MAX_MATCHES) break;
+                  }
+              }
+          }
+          closedir(dir);
+      }
   }
 
-  while (list_index < num_builtins) {
-    name = builtins[list_index];
-    list_index++;
-    if (strncmp(name, text, len) == 0) {
-      return strdup(name);  // must be strdup'd for readline to manage
-    }
+  // Return matches one by one
+  if (match_index < num_matches) {
+      return strdup(matches[match_index++]);
   }
+
   return NULL;
 }
 
-// called by readline when user pressed Tab
+// called by readline when user pressed Tab ("\t")
 char** my_completion(const char* text, int start, int end) {
   rl_attempted_completion_over = 1;  // don't use default filename completion
-  return rl_completion_matches(text, builtin_generator);
+  return rl_completion_matches(text, command_generator);
 }
 
-// break apart input into tokens, and store into args[]
+// break apart input into tokens, and store into args[] string array
 static int tokenize_input (char* rest, char* args[]) {
   // 2-D array: each token has its own array, used to build the full token that will go into args
   static char token_bufs[MAX_NUM_TOKENS][1000]; // max length of tokens: 999 chars
@@ -106,10 +153,8 @@ static int tokenize_input (char* rest, char* args[]) {
             }
             buf[j] = *rest;
             j++;
-            rest++;
-          } else {
-            rest++;
           }
+          rest++;
         }
         if (*rest == '\"') {
           rest++;  // skip ending quote
@@ -119,10 +164,8 @@ static int tokenize_input (char* rest, char* args[]) {
         if (j < 999) { 
           buf[j] = *rest;
           j++;
-          rest++;
-        } else {
-          rest++;
         }
+        rest++;
       }
     }
 
@@ -149,7 +192,7 @@ static char check_builtin(char *token) {
   return 1; // builtin not found
 }
 
-static char* find_in_path(char* token, char** paths, int path_count) {
+static char* find_in_path(char* token, char** paths) {
   DIR* dir;
   struct dirent* entry;
 
@@ -186,14 +229,14 @@ static void echo_handler(char* args[], int argc) {
   printf("\n");
 }
 
-static void type_handler(char* args[], int argc, char** paths, int path_count) {
+static void type_handler(char* args[], int argc, char** paths) {
   char *next_token;
   for (int i = 1; i < argc; i++) {
     next_token = args[i];
     if (!check_builtin(next_token)) {
       printf("%s is a shell builtin\n", next_token); // check if next_token is a builtin command
     } else {
-      char* search_path = find_in_path(next_token, paths, path_count); // search for next_token in PATH
+      char* search_path = find_in_path(next_token, paths); // search for next_token in PATH
       if (strcmp(search_path, "")) {
         printf("%s is %s/%s\n", next_token, search_path, next_token);
       } else {
@@ -262,7 +305,7 @@ int main(int argc, char *argv[], char * envp[]) {
   }
 
   // allocate array of strings
-  char** paths  = calloc((PATH_MAX), sizeof(char*)); // not accepting a PATH with any more than 999 paths
+  paths  = calloc((PATH_MAX), sizeof(char*)); // not accepting a PATH with any more than 999 paths
   if (!paths) {
     printf("String array allocation: Out of memory");
     return 1;
@@ -270,7 +313,7 @@ int main(int argc, char *argv[], char * envp[]) {
 
   // separate PATH into tokens and store into string array 
   char *token;
-  int path_count = 0;
+  path_count = 0;
   while ((token = strsep(&path, ":")) != NULL) {
     paths[path_count] = token; 
     path_count++;
@@ -292,7 +335,7 @@ int main(int argc, char *argv[], char * envp[]) {
     // Then, store into args[] array and update builtins to use args[] instead of temp_input
     char* args[MAX_NUM_TOKENS]; // array to hold args
     argc = tokenize_input(temp_input, args);
-    char* search_path = find_in_path(args[0], paths, path_count);
+    char* search_path = find_in_path(args[0], paths);
     
     // check for exit prompt
     if (!strcmp(args[0], "exit")) {
@@ -366,7 +409,7 @@ int main(int argc, char *argv[], char * envp[]) {
               break;
             case 2:
             case 4:
-              dup2(fd, STDERR_FILENO); // redirect stdout
+              dup2(fd, STDERR_FILENO); // redirect stderr
               break;
           }
           close(fd);               // close original fd
@@ -376,7 +419,7 @@ int main(int argc, char *argv[], char * envp[]) {
           echo_handler(args, argc);
 
         } else if (!strcmp(args[0], "type")) {
-          type_handler(args, argc, paths, path_count);
+          type_handler(args, argc, paths);
 
         } else if (!strcmp(args[0], "pwd")) {
           pwd_handler();
