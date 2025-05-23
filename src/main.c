@@ -337,6 +337,24 @@ int main(int argc, char *argv[], char * envp[]) {
     argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths);
     
+    // temp input is unchanged -- use it for pipe checking
+    char** pipes = calloc((MAX_NUM_TOKENS), sizeof(char*));
+    if (!pipes) {
+      printf("malloc failure");
+      return 1;
+    }
+
+    char* rest = temp_input;
+    char* segment;
+    int pipe_count = 0;
+    while ((segment = strsep(&rest, "|")) != NULL) {
+      // Trim leading spaces
+      while (*segment == ' ') segment++;
+      pipes[pipe_count] = segment;
+      pipe_count++;
+    }
+
+
     // check for exit prompt
     if (!strcmp(args[0], "exit")) {
       break;
@@ -383,6 +401,76 @@ int main(int argc, char *argv[], char * envp[]) {
     // special case: cd affects parent process directly
     if (!strcmp(args[0], "cd")) {
       cd_handler(args, argc, envp);
+    } else if (pipe_count > 1) {
+      
+      int pipefd[2 * (pipe_count - 1)]; // two fds per pipe
+
+      // create all pipes up front
+      for (int i = 0; i < pipe_count - 1; i++) {
+          if (pipe(pipefd + i*2) < 0) {
+              perror("pipe");
+              exit(1);
+          }
+      }
+
+      // fork each command
+      for (int i = 0; i < pipe_count; i++) {
+          pid_t pid = fork();
+          if (pid < 0) {
+              perror("fork");
+              exit(1);
+          }
+
+          if (pid == 0) {
+              // CHILD
+
+              // stdin from previous pipe (if not first command)
+              if (i != 0) {
+                  dup2(pipefd[(i-1)*2], STDIN_FILENO);
+              }
+
+              // stdout to next pipe (if not last command)
+              if (i != pipe_count - 1) {
+                  dup2(pipefd[i*2 + 1], STDOUT_FILENO);
+              }
+
+              // close all pipe fds in child
+              for (int j = 0; j < 2*(pipe_count-1); j++) {
+                  close(pipefd[j]);
+              }
+
+              // tokenize this segment
+              char* segment_args[MAX_NUM_TOKENS];
+              tokenize_input(pipes[i], segment_args);
+
+              // exec or handle built-in
+              if (!strcmp(segment_args[0], "echo")) {
+                  echo_handler(segment_args, argc);
+              } else {
+                  char* spath = find_in_path(segment_args[0], paths);
+                  if (strcmp(spath, "") != 0) {
+                      char *cmd_path = malloc(strlen(spath) + strlen(segment_args[0]) + 2);
+                      sprintf(cmd_path, "%s/%s", spath, segment_args[0]);
+                      execve(cmd_path, segment_args, envp);
+                      perror("exec");
+                      _exit(1);
+                  } else {
+                      fprintf(stderr, "%s: command not found\n", segment_args[0]);
+                      _exit(1);
+                  }
+              }
+          }
+      }
+
+      // close all pipe fds in parent
+      for (int i = 0; i < 2 * (pipe_count - 1); i++) {
+          close(pipefd[i]);
+      }
+
+      // wait for all children
+      for (int i = 0; i < pipe_count; i++) {
+          wait(NULL);
+      }
     } else {
       pid_t pid = fork();
       if (pid == -1) {
