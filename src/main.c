@@ -8,6 +8,7 @@
 #include <readline/history.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
 #define MAX_MATCHES 1024
@@ -21,6 +22,12 @@ static int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // 5
 
 char** paths;
 static int path_count;
+
+int is_pipe(int fd) {
+  struct stat st;
+  if (fstat(fd, &st) == -1) return 0;
+  return S_ISFIFO(st.st_mode);
+}
 
 // returns successive matches for the current input on repeated tab presses
 char *command_generator(const char *text, int state) {
@@ -224,9 +231,12 @@ static void echo_handler(char* args[], int argc) {
     if (args[i] == NULL) {
       break;
     }
-    printf("%s ", args[i]); // print rest of input, excluding first token (echo)
+    printf("%s", args[i]); // print rest of input, excluding first token (echo)
+    if (i < argc - 1) {printf(" ");}
   }
-  printf("\n");
+  if (!is_pipe(STDOUT_FILENO)) {
+    printf("\n");
+  }
 }
 
 static void type_handler(char* args[], int argc, char** paths) {
@@ -348,8 +358,15 @@ int main(int argc, char *argv[], char * envp[]) {
     char* segment;
     int pipe_count = 0;
     while ((segment = strsep(&rest, "|")) != NULL) {
-      // Trim leading spaces
+      
+      // Trim leading and following spaces
       while (*segment == ' ') segment++;
+      char *end = segment + strlen(segment) - 1;
+      while (end > segment && (*end == ' ' || *end == '\n')) {
+          *end = '\0';
+          end--;
+      }
+
       pipes[pipe_count] = segment;
       pipe_count++;
     }
@@ -445,7 +462,14 @@ int main(int argc, char *argv[], char * envp[]) {
 
               // exec or handle built-in
               if (!strcmp(segment_args[0], "echo")) {
-                  echo_handler(segment_args, argc);
+                echo_handler(segment_args, argc);
+                _exit(0);
+              } else if (!strcmp(segment_args[0], "pwd")) {
+                  pwd_handler();
+                  _exit(0);
+              } else if (!strcmp(segment_args[0], "type")) {
+                  type_handler(segment_args, argc, paths);
+                  _exit(0);
               } else {
                   char* spath = find_in_path(segment_args[0], paths);
                   if (strcmp(spath, "") != 0) {
@@ -505,7 +529,6 @@ int main(int argc, char *argv[], char * envp[]) {
 
         if (!strcmp(args[0], "echo")) {
           echo_handler(args, argc);
-
         } else if (!strcmp(args[0], "type")) {
           type_handler(args, argc, paths);
 
