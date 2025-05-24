@@ -25,7 +25,8 @@ Simply run it with ```.\main.exe```.
 
 ### Now what?
 You'll know everything worked when you see a prompt (`$`) show up.
-From there, treat it like a normal shell! Try out some builtin commands such as `echo`, `type`, `cd`, `pwd`, and `history`. 
+From there, treat it like a normal shell!
+Try out some builtin commands such as `echo`, `type`, `cd`, `pwd`, and `history`. 
 You can also use external commands such as `cat`, `ls`, `git` and more, as long as they are in your `PATH`.
 
 If you want to close the shell at any point, type `exit` at the prompt and press `Enter`.
