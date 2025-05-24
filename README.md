@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a POSIX-compliant shell very similar to Bash that I built entirely in C. 
+This is a POSIX-compliant shell very similar to Bash that I wrote in C. 
 It's capable of interpreting shell commands, running external programs and builtin commands (`type`, `cd`, `pwd`, `echo`, `history`, and `exit`). 
 
 In addition, the shell is capable of autocomplete for builtin commands as well as custom executables found in the user's PATH.                
