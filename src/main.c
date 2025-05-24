@@ -13,15 +13,15 @@
 #define PATH_MAX 1000
 #define MAX_MATCHES 1024
 
-// gcc -o main main.c -lreadline
-// to avoid linker errors when attempting to compile
+// To compile: "gcc -o main main.c -lreadline" to avoid linker errors when attempting to compile
 
-// built in commands (as opposed to external)
+char** paths; // string array for PATH
+static int path_count; // number of entries in PATH
+
+// built in commands (as opposed to external found in PATH)
 char* builtins[] = {"type", "echo", "exit", "pwd", "cd", "history"};
 static int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // 6
 
-char** paths;
-static int path_count;
 
 
 // returns successive matches for the current input on repeated tab presses
@@ -211,6 +211,7 @@ static char* find_in_path(char* token, char** paths) {
   return "";
 }
 
+// search inside envp (PATH, cwd, etc.)
 static char* find_in_env(char* envp[], char *token) {
   int token_len = strlen(token);
   for (int i = 0; envp[i] != NULL; i++) {
@@ -221,7 +222,7 @@ static char* find_in_env(char* envp[], char *token) {
 return 0; // not found
 }
 
-// if pipe is involved, don't add new line (causes wc to be off by one)
+// if pipe is involved, don't add new line (prevents off-by-one when using wc)
 int is_pipe(int fd) {
   struct stat st;
   if (fstat(fd, &st) == -1) return 0;
@@ -281,17 +282,15 @@ static void pwd_handler(void){
 }
 
 static void history_handler(int argc, char* args[], int history_count, char** input_history) {
-
+  int i;
+  int hist_limit;
   if (argc > 2) {
     printf("history: too many arguments\n");
     return;
-  }
-
-  int i;
-  if (argc == 1) {
+  } else if (argc == 1) {
     i = 1;
   } else {
-    int hist_limit = atoi(args[1]);
+    hist_limit = atoi(args[1]);
     if (hist_limit != 0) {
       i = history_count - hist_limit;
     } else {
@@ -299,33 +298,14 @@ static void history_handler(int argc, char* args[], int history_count, char** in
       return;
     }
   }
+  if (hist_limit > history_count) {
+    i = 1;
+  }
   while (i < history_count) {
     printf("%d %s\n", i, input_history[i]);
     i++;
   }
 }
-
-// static int external_handler(char* args[], char* envp[], char* search_path) {
-//   pid_t parent = getpid();
-//   pid_t pid = fork();
-//   if (pid == -1) {
-//       printf("error, failed to fork");
-//       return 1;
-//   } else if (pid > 0) {
-//       int status;
-//       waitpid(pid, &status, 0);
-//   } else {
-//     char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
-//     if (!complete_path) {
-//         return 1;
-//     }
-//     sprintf(complete_path, "%s/%s", search_path, args[0]);
-//     execve(complete_path, args, envp);
-//     _exit(EXIT_FAILURE);   // exec never returns
-//     return 2;
-//   }
-//   return 0;
-// }
 
 int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
@@ -360,7 +340,8 @@ int main(int argc, char *argv[], char * envp[]) {
   rl_attempted_completion_function = my_completion;
 
   while (1) {
-    // take input and format by removing trailing new line
+
+    // begin prompt ($)
     char* line = readline("$ ");
     if (!line) break;  // EOF (Ctrl+D)
     if (*line) add_history(line);  // save non-empty input
@@ -591,10 +572,6 @@ int main(int argc, char *argv[], char * envp[]) {
         waitpid(pid, &status, 0);
       }
     }
-
-    // print $ at start of next line
-    //printf("$ ");
   }
   return 0;
 }
-
