@@ -1,4 +1,4 @@
-how does this look?  [![progress-banner](https://backend.codecrafters.io/progress/shell/0fce3a66-dda0-4e30-8715-5636fcf6bb14)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+[![progress-banner](https://backend.codecrafters.io/progress/shell/0fce3a66-dda0-4e30-8715-5636fcf6bb14)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
 ## Overview
 I've always wondered how a shell worked under the hood.
