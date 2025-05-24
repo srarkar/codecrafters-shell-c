@@ -17,11 +17,11 @@ If you see an error related to undefined symbols for arm64 architecture, such as
 If you're curious, the `readline` library enables autocomplete by allowing the program to read inputs as they are typed, rather than waiting for a newline character.
 
 ### macOS/Linux
-Once main.c has been compiled, you'll see an executable called main in the same directory as main.c. Simply run it with ./main.
+Once main.c has been compiled, you'll see an executable called `main` in the same directory as `main.c`. Simply run it with ```./main```.
 
 ### Windows Powershell
-Once main.c has been compiled (which may require something like WSL or MinGW if you are using gcc), you'll have an executable file called main.exe in the same directory as main.c. 
-Simply run it with .\main.exe.
+Once `main.c` has been compiled (which may require something like `WSL` or `MinGW` if you are using `gcc`), you'll have an executable file called `main.exe` in the same directory as `main.c`. 
+Simply run it with ```.\main.exe```.
 
 ### Now what?
 You'll know everything worked when you see a prompt (`$`) show up.
