@@ -17,17 +17,12 @@
 // to avoid linker errors when attempting to compile
 
 // built in commands (as opposed to external)
-char* builtins[] = {"type", "echo", "exit", "pwd", "cd"};
-static int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // 5
+char* builtins[] = {"type", "echo", "exit", "pwd", "cd", "history"};
+static int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // 6
 
 char** paths;
 static int path_count;
 
-int is_pipe(int fd) {
-  struct stat st;
-  if (fstat(fd, &st) == -1) return 0;
-  return S_ISFIFO(st.st_mode);
-}
 
 // returns successive matches for the current input on repeated tab presses
 char *command_generator(const char *text, int state) {
@@ -226,6 +221,13 @@ static char* find_in_env(char* envp[], char *token) {
 return 0; // not found
 }
 
+// if pipe is involved, don't add new line (causes wc to be off by one)
+int is_pipe(int fd) {
+  struct stat st;
+  if (fstat(fd, &st) == -1) return 0;
+  return S_ISFIFO(st.st_mode);
+}
+
 static void echo_handler(char* args[], int argc) {
   for (int i = 1; i < argc; i++) { 
     if (args[i] == NULL) {
@@ -234,7 +236,8 @@ static void echo_handler(char* args[], int argc) {
     printf("%s", args[i]); // print rest of input, excluding first token (echo)
     if (i < argc - 1) {printf(" ");}
   }
-  if (!is_pipe(STDOUT_FILENO)) {
+  // only add new line if not piped 
+  if (!is_pipe(STDOUT_FILENO)) { 
     printf("\n");
   }
 }
@@ -275,6 +278,10 @@ static void pwd_handler(void){
   } else {
     printf("Error retrieving current working directory\n");
   }
+}
+
+static void history_handler() {
+  // lock in
 }
 
 // static int external_handler(char* args[], char* envp[], char* search_path) {
