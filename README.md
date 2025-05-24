@@ -1,9 +1,9 @@
 [![progress-banner](https://backend.codecrafters.io/progress/shell/0fce3a66-dda0-4e30-8715-5636fcf6bb14)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
 ## Overview
-I've always wondered how a shell worked under the hood.
 
-So, I built my own POSIX-compliant shell that's capable of interpreting shell commands, running external programs and builtin commands (type, cd, pwd, echo, history, and exit). 
+This is a POSIX-compliant shell very similar to Bash that I built entirely in C. 
+It's capable of interpreting shell commands, running external programs and builtin commands (`type`, `cd`, `pwd`, `echo`, `history`, and `exit`). 
 
 In addition, the shell is capable of autocomplete for builtin commands as well as custom executables found in the user's PATH.                
 Stdout and stderr redirection (`>` or `1>`, `2>`, `>>` or `1>>`, `2>>`) as well as pipelines (`|`) are supported.
