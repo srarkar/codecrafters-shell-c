@@ -4,6 +4,7 @@
 I've always wondered how a shell worked under the hood.
 
 So, I built my own POSIX-compliant shell that's capable of interpreting shell commands, running external programs and builtin commands (type, cd, pwd, echo, history, and exit). 
+
 In addition, the shell is capable of autocomplete for builtin commands as well as custom executables found in the user's PATH.
 Stdout and stderr redirection (`>` or `1>`, `2>`, `>>` or `1>>`, `2>>`) as well as pipelines (`|`) are supported.
 
