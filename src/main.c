@@ -280,9 +280,28 @@ static void pwd_handler(void){
   }
 }
 
-static void history_handler(int history_count, char** input_history) {
-  for (int i = 1; i < history_count; i++) {
+static void history_handler(int argc, char* args[], int history_count, char** input_history) {
+
+  if (argc > 2) {
+    printf("history: too many arguments\n");
+    return;
+  }
+
+  int i;
+  if (argc == 1) {
+    i = 1;
+  } else {
+    int hist_limit = atoi(args[1]);
+    if (hist_limit != 0) {
+      i = history_count - hist_limit;
+    } else {
+      printf("history: second argument must have a valid integer representation\n");
+      return;
+    }
+  }
+  while (i < history_count) {
     printf("%d %s\n", i, input_history[i]);
+    i++;
   }
 }
 
@@ -551,7 +570,7 @@ int main(int argc, char *argv[], char * envp[]) {
           pwd_handler();
 
         } else if (!strcmp(args[0], "history")) {
-          history_handler(history_count, input_history);
+          history_handler(argc, args, history_count, input_history);
 
         } else if (strcmp(search_path, "") != 0) {
           char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
