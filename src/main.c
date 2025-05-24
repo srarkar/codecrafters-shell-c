@@ -280,8 +280,10 @@ static void pwd_handler(void){
   }
 }
 
-static void history_handler() {
-  // lock in
+static void history_handler(int history_count, char** input_history) {
+  for (int i = 1; i < history_count; i++) {
+    printf("%d %s\n", i, input_history[i]);
+  }
 }
 
 // static int external_handler(char* args[], char* envp[], char* search_path) {
@@ -309,10 +311,11 @@ static void history_handler() {
 int main(int argc, char *argv[], char * envp[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
-  //printf("$ ");
   
   // Wait for user input;
   char input[MAX_NUM_TOKENS];
+  char** input_history = calloc(MAX_NUM_TOKENS, sizeof(char*) * PATH_MAX); // allocate 1000 history entries at max
+  int history_count = 1;
 
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
   char* path = strdup(find_in_env(envp, "PATH="));
@@ -353,6 +356,10 @@ int main(int argc, char *argv[], char * envp[]) {
     char* args[MAX_NUM_TOKENS]; // array to hold args
     argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths);
+
+    // add input to history  2-D array
+    input_history[history_count] = strdup(temp_input);
+    history_count++;
     
     // temp input is unchanged -- use it for pipe checking
     char** pipes = calloc((MAX_NUM_TOKENS), sizeof(char*));
@@ -536,11 +543,15 @@ int main(int argc, char *argv[], char * envp[]) {
 
         if (!strcmp(args[0], "echo")) {
           echo_handler(args, argc);
+
         } else if (!strcmp(args[0], "type")) {
           type_handler(args, argc, paths);
 
         } else if (!strcmp(args[0], "pwd")) {
           pwd_handler();
+
+        } else if (!strcmp(args[0], "history")) {
+          history_handler(history_count, input_history);
 
         } else if (strcmp(search_path, "") != 0) {
           char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
@@ -554,6 +565,7 @@ int main(int argc, char *argv[], char * envp[]) {
           printf("%s: command not found\n", args[0]);
         }
         exit(0); // exit after builtin execution
+
       } else {
         // PARENT
         int status;
