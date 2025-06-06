@@ -399,6 +399,12 @@ int main(int argc, char *argv[], char * envp[]) {
   }
   rl_attempted_completion_function = my_completion;
 
+  char* histfile_env = find_in_env(envp, "HISTFILE=");
+  if (histfile_env && histfile_env[0] != '\0') {
+      // Load history from file
+      read_history(histfile_env);
+  }
+
   while (1) {
 
     // begin prompt ($)
