@@ -38,6 +38,7 @@ char* read_line(FILE* file) {
 char** paths; // string array for PATH
 static int path_count; // number of entries in PATH
 static int history_count = 1;
+static int history_saved = 0;
 
 // built in commands (as opposed to external found in PATH)
 char* builtins[] = {"type", "echo", "exit", "pwd", "cd", "history"};
@@ -334,6 +335,21 @@ static void history_handler(int argc, char* args[]) {
             if (ret != 0) {
                 perror("history -w");
             }
+        } else if (strcmp(args[1], "-a") == 0) {
+          if (argc < 3) {
+            printf("history -a: filename required\n");
+            return;
+          }
+
+          int new_entries = history_length - history_saved;
+          if (new_entries > 0) {
+            int ret = append_history(new_entries, args[2]);
+            if (ret != 0) {
+              perror("history -a");
+            } else {
+              history_saved = history_length; // update the save point
+            }
+          }
         } else {
             int limit = atoi(args[1]);
             if (limit <= 0) {
