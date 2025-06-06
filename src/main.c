@@ -12,11 +12,32 @@
 #define MAX_NUM_TOKENS 100
 #define PATH_MAX 1000
 #define MAX_MATCHES 1024
+#define MAX_LINE_LENGTH 1024
+
+char* read_line(FILE* file) {
+  char* buffer = malloc(MAX_LINE_LENGTH);
+  if (!buffer) return NULL;
+
+  int c, i = 0;
+  while ((c = fgetc(file)) != EOF && c != '\n') {
+    if (i < MAX_LINE_LENGTH - 1) {
+      buffer[i++] = c;
+    }
+  }
+  if (c == EOF && i == 0) {
+    free(buffer);
+    return NULL;
+  }
+  buffer[i] = '\0';
+  return buffer;
+}
+
 
 // To compile: "gcc -o main main.c -lreadline" to avoid linker errors when attempting to compile
 
 char** paths; // string array for PATH
 static int path_count; // number of entries in PATH
+static int history_count = 1;
 
 // built in commands (as opposed to external found in PATH)
 char* builtins[] = {"type", "echo", "exit", "pwd", "cd", "history"};
@@ -281,30 +302,55 @@ static void pwd_handler(void){
   }
 }
 
-static void history_handler(int argc, char* args[], int history_count, char** input_history) {
-  int i;
-  int hist_limit;
-  if (argc > 2) {
-    printf("history: too many arguments\n");
-    return;
-  } else if (argc == 1) {
-    i = 1;
-  } else {
-    hist_limit = atoi(args[1]);
-    if (hist_limit != 0) {
-      i = history_count - hist_limit;
-    } else {
-      printf("history: second argument must have a valid integer representation\n");
-      return;
+static void history_handler(int argc, char* args[]) {
+    if (argc > 3) {
+        printf("history: too many arguments\n");
+        return;
     }
-  }
-  if (hist_limit > history_count) {
-    i = 1;
-  }
-  while (i < history_count) {
-    printf("%d %s\n", i, input_history[i]);
-    i++;
-  }
+
+    if (argc == 1) {
+        // Just print full history
+        for (int i = 0; i < history_length; i++) {
+          HIST_ENTRY *entry = history_get(i + history_base);
+          if (entry)
+            printf("%d  %s\n", i + 1, entry->line);
+        }
+    } else {
+        if (strcmp(args[1], "-r") == 0) {
+            if (argc < 3) {
+                printf("history -r: filename required\n");
+                return;
+            }
+            int ret = read_history(args[2]);
+            if (ret != 0) {
+                perror("history -r");
+            }
+        } else if (strcmp(args[1], "-w") == 0) {
+            if (argc < 3) {
+                printf("history -w: filename required\n");
+                return;
+            }
+            int ret = write_history(args[2]);
+            if (ret != 0) {
+                perror("history -w");
+            }
+        } else {
+            int limit = atoi(args[1]);
+            if (limit <= 0) {
+                printf("history: invalid argument\n");
+                return;
+            }
+
+            int start = history_length - limit;
+            if (start < 0) start = 0;
+
+            for (int i = start; i < history_length; i++) {
+                HIST_ENTRY *entry = history_get(i + history_base);
+                if (entry)
+                    printf("%d  %s\n", i + 1, entry->line);
+            }
+          }
+    }
 }
 
 int main(int argc, char *argv[], char * envp[]) {
@@ -313,8 +359,6 @@ int main(int argc, char *argv[], char * envp[]) {
   
   // Wait for user input;
   char input[MAX_NUM_TOKENS];
-  char** input_history = calloc(MAX_NUM_TOKENS, sizeof(char*) * PATH_MAX); // allocate 1000 history entries at max
-  int history_count = 1;
 
   // grab PATH using getenv(). Alternatively, use parameter "char *envp[]" for main().
   char* path = strdup(find_in_env(envp, "PATH="));
@@ -357,10 +401,6 @@ int main(int argc, char *argv[], char * envp[]) {
     argc = tokenize_input(temp_input, args);
     char* search_path = find_in_path(args[0], paths);
 
-    // add input to history  2-D array
-    input_history[history_count] = strdup(temp_input);
-    history_count++;
-    
     // temp input is unchanged -- use it for pipe checking
     char** pipes = calloc((MAX_NUM_TOKENS), sizeof(char*));
     if (!pipes) {
@@ -432,6 +472,8 @@ int main(int argc, char *argv[], char * envp[]) {
     // special case: cd affects parent process directly
     if (!strcmp(args[0], "cd")) {
       cd_handler(args, argc, envp);
+    }  else if (!strcmp(args[0], "history")) {
+      history_handler(argc, args);
     } else if (pipe_count > 1) {
       
       int pipefd[2 * (pipe_count - 1)]; // two fds per pipe
@@ -551,7 +593,7 @@ int main(int argc, char *argv[], char * envp[]) {
           pwd_handler();
 
         } else if (!strcmp(args[0], "history")) {
-          history_handler(argc, args, history_count, input_history);
+          history_handler(argc, args);
 
         } else if (strcmp(search_path, "") != 0) {
           char *complete_path = malloc(strlen(search_path) + strlen(args[0]) + 2); // "/" and "\0"
