@@ -400,7 +400,7 @@ int main(int argc, char *argv[], char * envp[]) {
   rl_attempted_completion_function = my_completion;
 
   char* histfile_env = find_in_env(envp, "HISTFILE=");
-  if (histfile_env && histfile_env[0] != '\0') {
+    if (histfile_env && histfile_env[0] != '\0') {
       // Load history from file
       read_history(histfile_env);
   }
@@ -450,6 +450,9 @@ int main(int argc, char *argv[], char * envp[]) {
 
     // check for exit prompt
     if (!strcmp(args[0], "exit")) {
+      if (histfile_env && histfile_env[0] != '\0') {
+        write_history(histfile_env);  // save all history to file
+      }
       break;
     }
     
