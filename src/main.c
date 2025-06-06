@@ -14,31 +14,12 @@
 #define MAX_MATCHES 1024
 #define MAX_LINE_LENGTH 1024
 
-char* read_line(FILE* file) {
-  char* buffer = malloc(MAX_LINE_LENGTH);
-  if (!buffer) return NULL;
-
-  int c, i = 0;
-  while ((c = fgetc(file)) != EOF && c != '\n') {
-    if (i < MAX_LINE_LENGTH - 1) {
-      buffer[i++] = c;
-    }
-  }
-  if (c == EOF && i == 0) {
-    free(buffer);
-    return NULL;
-  }
-  buffer[i] = '\0';
-  return buffer;
-}
-
-
 // To compile: "gcc -o main main.c -lreadline" to avoid linker errors when attempting to compile
 
 char** paths; // string array for PATH
 static int path_count; // number of entries in PATH
 static int history_count = 1;
-static int history_saved = 0;
+static int history_saved = 0; // used for history -a (append)
 
 // built in commands (as opposed to external found in PATH)
 char* builtins[] = {"type", "echo", "exit", "pwd", "cd", "history"};
